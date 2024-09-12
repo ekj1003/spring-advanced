@@ -38,6 +38,112 @@ class ManagerServiceTest {
     @InjectMocks
     private ManagerService managerService;
 
+    // 매니저 테스트 추가1
+    @Test
+    void saveManager_일정_작성자가_본인을_매니저로_등록할_경우_예외가_발생한다() {
+        // given
+        AuthUser authUser = new AuthUser(1L, "test1@naver.com", UserRole.USER);
+        long todoId = 1L;
+        long managerUserId = 1L; // 본인 아이디
+
+        Todo todo = new Todo();
+        ReflectionTestUtils.setField(todo, "user", User.fromAuthUser(authUser));
+
+        ManagerSaveRequest managerSaveRequest = new ManagerSaveRequest(managerUserId);
+
+        given(todoRepository.findById(todoId)).willReturn(Optional.of(todo));
+        given(userRepository.findById(managerUserId)).willReturn(Optional.of(User.fromAuthUser(authUser)));
+
+        // when & then
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () ->
+                managerService.saveManager(authUser, todoId, managerSaveRequest)
+        );
+
+        assertEquals("일정 작성자는 본인을 담당자로 등록할 수 없습니다.", exception.getMessage());
+    }
+
+    // 매니저 테스트 추가2
+    @Test
+    void saveManager_등록하려는_매니저_유저가_존재하지_않는_경우_예외가_발생한다() {
+        // given
+        AuthUser authUser = new AuthUser(1L, "test1@naver.com", UserRole.USER);
+        long todoId = 1L;
+        long managerUserId = 2L; // 존재하지 않는 매니저
+
+        Todo todo = new Todo();
+        ReflectionTestUtils.setField(todo, "user", User.fromAuthUser(authUser));
+
+        ManagerSaveRequest managerSaveRequest = new ManagerSaveRequest(managerUserId);
+
+        given(todoRepository.findById(todoId)).willReturn(Optional.of(todo));
+        given(userRepository.findById(managerUserId)).willReturn(Optional.empty());
+
+        // when & then
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () ->
+                managerService.saveManager(authUser, todoId, managerSaveRequest)
+        );
+
+        assertEquals("등록하려고 하는 담당자 유저가 존재하지 않습니다.", exception.getMessage());
+    }
+
+    // 매니저 테스트 추가3
+    @Test
+    void deleteManager_일정_작성자가_아닌_경우_예외가_발생한다() {
+        // given
+        long userId = 1L;
+        long todoId = 1L;
+        long managerId = 1L;
+
+        User user = new User();
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        Todo todo = new Todo();
+        ReflectionTestUtils.setField(todo, "id", todoId);
+        ReflectionTestUtils.setField(todo, "user", new User());
+
+        Manager manager = new Manager(new User(), todo);
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(todoRepository.findById(todoId)).willReturn(Optional.of(todo));
+
+        // when & then
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () ->
+                managerService.deleteManager(userId, todoId, managerId)
+        );
+
+        assertEquals("해당 일정을 만든 유저가 유효하지 않습니다.", exception.getMessage());
+    }
+
+    // 매니저 테스트 추가4
+    @Test
+    void deleteManager_매니저가_해당_일정에_등록되지_않은_경우_예외가_발생한다() {
+        // given
+        long userId = 1L;
+        long todoId = 1L;
+        long managerId = 1L;
+
+        User user = new User();
+        ReflectionTestUtils.setField(user, "id", userId);
+
+        Todo todo = new Todo();
+        ReflectionTestUtils.setField(todo, "id", todoId);
+        ReflectionTestUtils.setField(todo, "user", user);
+
+        Manager manager = new Manager(new User(), new Todo());
+
+        given(userRepository.findById(userId)).willReturn(Optional.of(user));
+        given(todoRepository.findById(todoId)).willReturn(Optional.of(todo));
+        given(managerRepository.findById(managerId)).willReturn(Optional.of(manager));
+
+        // when & then
+        InvalidRequestException exception = assertThrows(InvalidRequestException.class, () ->
+                managerService.deleteManager(userId, todoId, managerId)
+        );
+
+        assertEquals("해당 일정에 등록된 담당자가 아닙니다.", exception.getMessage());
+    }
+
+
     @Test
     public void manager_목록_조회_시_Todo가_없다면_InvalidRequestException_에러를_던진다() {
         // given
